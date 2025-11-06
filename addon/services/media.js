@@ -1,10 +1,10 @@
-import Ember from 'ember';
 import { run } from '@ember/runloop';
 import Service from '@ember/service';
 import { classify, dasherize } from '@ember/string';
 import { getOwner } from '@ember/application';
 import Evented from '@ember/object/evented';
 import { tracked, TrackedObject } from 'tracked-built-ins';
+import { macroCondition, isTesting } from '@embroider/macros';
 
 /**
  * Handles detecting and responding to media queries.
@@ -74,9 +74,8 @@ import { tracked, TrackedObject } from 'tracked-built-ins';
  * @extends Ember.Service
  */
 export default class MediaService extends Service.extend(Evented) {
-  // Ember only sets Ember.testing when tests are starting
-  // eslint-disable-next-line ember/no-ember-testing-in-module-scope
-  _mocked = Ember.testing;
+  // Use @embroider/macros to detect test mode instead of deprecated Ember.testing
+  _mocked = macroCondition(isTesting()) ? true : false;
   _mockedBreakpoint = 'desktop';
 
   /**
@@ -107,7 +106,10 @@ export default class MediaService extends Service.extend(Evented) {
     if (this._matches.length) {
       return this._matches;
     }
-    return Ember.testing && this._mocked ? [this._mockedBreakpoint] : [];
+    if (macroCondition(isTesting())) {
+      return this._mocked ? [this._mockedBreakpoint] : [];
+    }
+    return [];
   }
   set matches(value) {
     this._matches = value;
@@ -212,8 +214,13 @@ export default class MediaService extends Service.extend(Evented) {
    */
   match(name, query) {
     // see https://github.com/ember-cli/eslint-plugin-ember/pull/272
-    if ((Ember.testing && this._mocked) || !this.enabled) {
+    if (!this.enabled) {
       return;
+    }
+    if (macroCondition(isTesting())) {
+      if (this._mocked) {
+        return;
+      }
     }
 
     const mql = this.mql,
